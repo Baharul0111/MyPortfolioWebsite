@@ -5,6 +5,20 @@
 
 @import url("https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap");
 
+/* Registered custom properties — animatable. Silently ignored where
+   unsupported, which degrades to a correct static render. */
+@property --pass {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@property --draw {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
 /* ---------- 1. Tokens ---------------------------------------------------- */
 
 :root {
@@ -20,7 +34,7 @@
   /* ink */
   --ink: #e9edf7;
   --ink-dim: #a6b0c6;
-  --ink-faint: #6c778f;
+  --ink-faint: #8792a8;
 
   /* accents */
   --violet: #7c5cff;
@@ -57,6 +71,33 @@
   --c-ollama: #dfe4ee;
   --c-circleci: #dfe4ee;
   --c-anthropic: #d97757;
+
+  /* ---- AI layer: domain accents (rail + tags read these) ---------------- */
+  --agentic:  #8b5cf6;   /* agent graphs / orchestration */
+  --research: #22d3ee;   /* research, NLP, retrieval     */
+  --systems:  #a3e635;   /* systems, tooling, infra      */
+  --quant:    #fbbf24;   /* data & quant                 */
+  --wip:      #ff5ca8;   /* in progress                  */
+
+  /* per-card accent — overridden by [data-tags]; never hard-code downstream */
+  --accent:     var(--violet);
+  --accent-rgb: 124 92 255;      /* space-separated channels for rgb( / a ) */
+  --accent-ink: #b7a6ff;         /* legible text tint of the accent         */
+
+  /* ---- attention lattice ------------------------------------------------ */
+  --lattice:      rgba(255, 255, 255, 0.045);
+  --lattice-cell: 2.2rem;
+  --lattice-hot:  rgba(255, 255, 255, 0.10);
+
+  /* ---- signal ----------------------------------------------------------- */
+  --signal:      #e4ebff;
+  --rail-w:      2px;
+  --ease-signal: cubic-bezier(0.4, 0, 0.2, 1);
+  --spring:      cubic-bezier(0.34, 1.42, 0.5, 1);
+
+  /* ---- projects section signature --------------------------------------- */
+  --strip: 48rem;
+  --cells: 16;
 }
 
 /* ---------- 2. Reset ----------------------------------------------------- */
@@ -117,6 +158,17 @@ textarea {
   color: inherit;
   border: none;
   background: none;
+}
+
+/* One visible keyboard affordance for everything focusable. Never remove this:
+   `outline: none` on buttons made the whole site unusable by keyboard. */
+:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 3px;
+  border-radius: 0.4rem;
+}
+
+:focus:not(:focus-visible) {
   outline: none;
 }
 
@@ -1577,16 +1629,10 @@ header.stuck {
   display: flex;
   flex-direction: column;
   padding: 3rem;
-  transition: transform 0.5s var(--ease), border-color 0.4s, box-shadow 0.5s var(--ease),
-    opacity 0.4s, filter 0.4s;
 }
 
 .project.hide {
   display: none;
-}
-
-.project:hover {
-  transform: translateY(-8px);
 }
 
 .proj-head {
@@ -1605,15 +1651,6 @@ header.stuck {
   place-items: center;
   border-radius: 1.6rem;
   font-size: 2.1rem;
-  background: rgba(124, 92, 255, 0.14);
-  color: #a78bfa;
-  border: 1px solid rgba(124, 92, 255, 0.22);
-  transition: transform 0.5s var(--ease), background 0.4s;
-}
-
-.project:hover .proj-icon {
-  transform: rotate(-8deg) scale(1.06);
-  background: rgba(124, 92, 255, 0.24);
 }
 
 .badge {
@@ -1690,11 +1727,6 @@ header.stuck {
 }
 
 /* coming-soon card */
-.project.soon {
-  border-style: dashed;
-  background: rgba(255, 92, 168, 0.03);
-}
-
 .soon-pulse {
   display: inline-grid;
   place-items: center;
@@ -1706,6 +1738,333 @@ header.stuck {
   color: var(--pink);
   font-size: 2.1rem;
   animation: breathe 2.6s ease-in-out infinite;
+}
+
+/* ---------- 17b. Projects — "forward pass" layer -------------------------
+   Three motifs, deliberately no more:
+     · attention lattice — a faint weight grid with a few cells burning hotter
+     · logit rail        — a quantised softmax column encoding the domain
+     · signal trace      — one packet tracing the border on hover
+   ------------------------------------------------------------------------- */
+
+.project {
+  /* default accent; the [data-tags] rules below reassign it */
+  --accent: var(--violet);
+  --accent-rgb: 124 92 255;
+  --accent-ink: #b7a6ff;
+
+  /* own stacking context, so the z-index:-1 pseudo stays INSIDE the card:
+     it paints above the card background but below the text. */
+  isolation: isolate;
+
+  border-color: rgb(var(--accent-rgb) / 0.16);
+
+  /* layer 1 — cursor heat, banded into discrete contours rather than a
+     smooth glow, so it reads as a loss surface and not a spotlight.
+     layer 2 — the logit rail down the left edge.
+     layer 3 — the original glass base, untouched. */
+  background-image:
+    radial-gradient(
+      280px circle at var(--mx, 50%) var(--my, 50%),
+      rgb(var(--accent-rgb) / 0.16) 0%,
+      rgb(var(--accent-rgb) / 0.16) 22%,
+      rgb(var(--accent-rgb) / 0.09) 23%,
+      rgb(var(--accent-rgb) / 0.09) 44%,
+      rgb(var(--accent-rgb) / 0.05) 45%,
+      rgb(var(--accent-rgb) / 0.05) 66%,
+      transparent 67%
+    ),
+    linear-gradient(
+      180deg,
+      rgb(var(--accent-rgb) / 0.95) 0 18%,
+      rgb(var(--accent-rgb) / 0.40) 18% 30%,
+      rgb(var(--accent-rgb) / 0.78) 30% 46%,
+      rgb(var(--accent-rgb) / 0.18) 46% 58%,
+      rgb(var(--accent-rgb) / 0.60) 58% 78%,
+      rgb(var(--accent-rgb) / 0.12) 78% 100%
+    ),
+    linear-gradient(160deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.015));
+  background-size: 100% 100%, var(--rail-w) 82%, 100% 100%;
+  background-position: 0 0, left 0 top 9%, 0 0;
+  background-repeat: no-repeat;
+
+  /* the transform is composed from a variable so the WAAPI filter animation
+     can take the element over and hand it back without clobbering hover */
+  --lift: 0px;
+  transform: translate3d(0, var(--lift), 0);
+  transition: transform 0.55s var(--spring), border-color 0.4s var(--ease),
+    box-shadow 0.45s var(--ease), opacity 0.4s;
+}
+
+/* ---- domain accents. Source order matters: .soon must stay last --------- */
+.project[data-tags~="agents"]   { --accent: var(--agentic);  --accent-rgb: 139  92 246; --accent-ink: #c4b5fd; }
+.project[data-tags~="research"] { --accent: var(--research); --accent-rgb:  34 211 238; --accent-ink: #7dd3fc; }
+.project[data-tags~="systems"]  { --accent: var(--systems);  --accent-rgb: 163 230  53; --accent-ink: #bef264; }
+.project[data-tags~="data"]     { --accent: var(--quant);    --accent-rgb: 251 191  36; --accent-ink: #fcd34d; }
+
+/* the "in progress" card is dashed and pink, and must win over every tag rule */
+.project.soon {
+  --accent: var(--wip);
+  --accent-rgb: 255 92 168;
+  --accent-ink: #f9a8d4;
+  border-style: dashed;
+  background-image:
+    radial-gradient(
+      280px circle at var(--mx, 50%) var(--my, 50%),
+      rgb(255 92 168 / 0.12) 0%,
+      rgb(255 92 168 / 0.12) 30%,
+      rgb(255 92 168 / 0.05) 31%,
+      rgb(255 92 168 / 0.05) 60%,
+      transparent 61%
+    ),
+    linear-gradient(
+      180deg,
+      rgb(255 92 168 / 0.70) 0 18%,
+      rgb(255 92 168 / 0.22) 18% 34%,
+      rgb(255 92 168 / 0.50) 34% 52%,
+      rgb(255 92 168 / 0.14) 52% 100%
+    ),
+    linear-gradient(160deg, rgba(255, 92, 168, 0.05), rgba(255, 255, 255, 0.012));
+}
+
+/* ---- ::after — attention heat map: lattice + a few hot weights ---------- */
+.project::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgb(var(--accent-rgb) / 0.26) 0 0),
+    linear-gradient(var(--lattice-hot) 0 0),
+    linear-gradient(rgb(var(--accent-rgb) / 0.14) 0 0),
+    linear-gradient(rgb(var(--accent-rgb) / 0.10) 0 0),
+    linear-gradient(90deg, var(--lattice) 1px, transparent 1px),
+    linear-gradient(180deg, var(--lattice) 1px, transparent 1px);
+  background-size:
+    var(--lattice-cell) var(--lattice-cell),
+    var(--lattice-cell) var(--lattice-cell),
+    var(--lattice-cell) var(--lattice-cell),
+    var(--lattice-cell) var(--lattice-cell),
+    var(--lattice-cell) var(--lattice-cell),
+    var(--lattice-cell) var(--lattice-cell);
+  background-position:
+    right 4.4rem top 2.2rem,
+    right 2.2rem top 6.6rem,
+    right 8.8rem top 4.4rem,
+    right 6.6rem top 11rem,
+    right 0 top 0,
+    right 0 top 0;
+  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, repeat, repeat;
+  /* keep it a corner motif, never wallpaper */
+  -webkit-mask-image: radial-gradient(115% 88% at 92% -4%, #000 0%, transparent 58%);
+          mask-image: radial-gradient(115% 88% at 92% -4%, #000 0%, transparent 58%);
+  opacity: 0.62;
+  transition: opacity 0.5s var(--ease);
+}
+
+.project:hover::after,
+.project:focus-within::after {
+  opacity: 1;
+}
+
+/* ---- ::before — the traced hairline: one forward pass, on hover only ----
+   This overrides .card::before (the generic spotlight) by source order.
+   Where @property is unsupported the conic renders static at 0deg — a fixed
+   accent arc on the lower edge. Still correct, never broken. */
+.project::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  border-radius: calc(var(--r-lg) - 1px);
+  padding: 1px;
+  background: conic-gradient(
+    from var(--pass),
+    transparent 0turn,
+    transparent 0.58turn,
+    rgb(var(--accent-rgb) / 0.45) 0.78turn,
+    var(--signal) 0.87turn,
+    rgb(var(--accent-rgb) / 0.45) 0.94turn,
+    transparent 1turn
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+          mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.35s var(--ease);
+  pointer-events: none;
+}
+
+.project:hover::before,
+.project:focus-within::before {
+  opacity: 1;
+  animation: forward-pass 1.5s var(--ease-signal) forwards; /* ONCE. */
+}
+
+@keyframes forward-pass {
+  to { --pass: 1turn; }
+}
+
+/* ---- the node: signal pulse on the icon --------------------------------- */
+.proj-icon {
+  position: relative;
+  z-index: 2;
+  background: rgb(var(--accent-rgb) / 0.13);
+  color: var(--accent-ink);
+  border: 1px solid rgb(var(--accent-rgb) / 0.26);
+  transition: transform 0.5s var(--spring), background 0.4s var(--ease),
+    border-color 0.4s var(--ease);
+}
+
+.proj-icon::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  border: 1px solid rgb(var(--accent-rgb) / 0.6);
+  opacity: 0;
+  pointer-events: none;
+}
+
+@keyframes node-fire {
+  0%   { opacity: 0.85; transform: scale(1); }
+  70%  { opacity: 0; transform: scale(1.5); }
+  100% { opacity: 0; transform: scale(1.5); }
+}
+
+/* ---- tags inherit the domain accent (scoped, so the timeline stays cyan) - */
+.project .tag {
+  background: rgb(var(--accent-rgb) / 0.08);
+  border: 1px solid rgb(var(--accent-rgb) / 0.20);
+  color: var(--accent-ink);
+  transition: transform 0.4s var(--spring), background 0.3s var(--ease),
+    border-color 0.3s var(--ease);
+}
+
+/* ---- bullets become matrix cells, not carets ---------------------------- */
+.project .proj-points li::before {
+  content: "";
+  font-family: inherit;
+  width: 0.62rem;
+  height: 0.62rem;
+  border-radius: 0.15rem;
+  top: 0.62em;
+  background: rgb(var(--accent-rgb) / 0.85);
+  box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.12); /* static, never animated */
+}
+
+/* ---- physical hover: five coordinated micro-motions, transform only ----- */
+@media (hover: hover) and (pointer: fine) {
+  .project:hover,
+  .project:focus-within {
+    --lift: -10px;
+    border-color: rgb(var(--accent-rgb) / 0.38);
+    box-shadow: 0 32px 60px -28px rgba(0, 0, 0, 0.85),
+      0 0 0 1px rgb(var(--accent-rgb) / 0.28);
+  }
+
+  .project:active {
+    --lift: -4px;
+    transition-duration: 0.12s;
+  }
+
+  .project:hover .proj-icon,
+  .project:focus-within .proj-icon {
+    transform: translate3d(0, -2px, 0) rotate(-6deg) scale(1.05);
+    background: rgb(var(--accent-rgb) / 0.22);
+    border-color: rgb(var(--accent-rgb) / 0.45);
+  }
+
+  .project:hover .proj-icon::before,
+  .project:focus-within .proj-icon::before {
+    animation: node-fire 1.3s var(--ease-io) 2; /* two beats, then silence */
+  }
+
+  .project:hover .tag {
+    transform: translate3d(0, -2px, 0);
+    background: rgb(var(--accent-rgb) / 0.13);
+    border-color: rgb(var(--accent-rgb) / 0.34);
+    transition-delay: calc(var(--ti, 0) * 16ms);
+  }
+
+  .project:hover .proj-foot .btn i,
+  .project:hover .proj-foot .btn .i {
+    transform: translate3d(3px, 0, 0);
+  }
+}
+
+.proj-foot .btn i,
+.proj-foot .btn .i {
+  transition: transform 0.35s var(--ease);
+}
+
+/* ---------- 17c. Projects section signature — the attention row ----------
+   16 quantised weight cells with a single bright cell stepping across them:
+   argmax scanning the row. Transform-only, so it never repaints layout. */
+
+#projects .section-head {
+  position: relative;
+  padding-bottom: 3.2rem;
+  margin-bottom: 4.2rem;
+}
+
+#projects .section-head::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: var(--strip);
+  max-width: 100%;
+  height: 1.4rem;
+  border-radius: 0.3rem;
+  background: linear-gradient(
+    90deg,
+    rgb(124 92 255 / 0.14) 0 6.25%,
+    rgb(124 92 255 / 0.55) 6.25% 12.5%,
+    rgb(34 211 238 / 0.10) 12.5% 18.75%,
+    rgb(34 211 238 / 0.30) 18.75% 25%,
+    rgb(124 92 255 / 0.80) 25% 31.25%,
+    rgb(34 211 238 / 0.12) 31.25% 37.5%,
+    rgb(124 92 255 / 0.22) 37.5% 43.75%,
+    rgb(34 211 238 / 0.62) 43.75% 50%,
+    rgb(124 92 255 / 0.16) 50% 56.25%,
+    rgb(34 211 238 / 0.40) 56.25% 62.5%,
+    rgb(124 92 255 / 0.90) 62.5% 68.75%,
+    rgb(34 211 238 / 0.18) 68.75% 75%,
+    rgb(124 92 255 / 0.34) 75% 81.25%,
+    rgb(34 211 238 / 0.52) 81.25% 87.5%,
+    rgb(124 92 255 / 0.12) 87.5% 93.75%,
+    rgb(34 211 238 / 0.26) 93.75% 100%
+  );
+  -webkit-mask: repeating-linear-gradient(90deg, #000 0 calc(6.25% - 2px), transparent calc(6.25% - 2px) 6.25%);
+          mask: repeating-linear-gradient(90deg, #000 0 calc(6.25% - 2px), transparent calc(6.25% - 2px) 6.25%);
+  pointer-events: none;
+}
+
+#projects .section-head::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  z-index: 1;
+  width: calc(var(--strip) / var(--cells) - 2px);
+  height: 1.4rem;
+  border-radius: 0.3rem;
+  background: linear-gradient(180deg, #ffffff, var(--cyan));
+  opacity: 0.92;
+  pointer-events: none;
+  animation: argmax-scan 7.5s steps(var(--cells), jump-none) infinite;
+}
+
+@keyframes argmax-scan {
+  from { transform: translateX(0); }
+  to   { transform: translateX(calc(var(--strip) - var(--strip) / var(--cells))); }
+}
+
+@media (max-width: 640px) {
+  #projects .section-head { --strip: 30rem; }
 }
 
 /* ---------- 18. Publications --------------------------------------------- */
@@ -2418,7 +2777,9 @@ footer {
   transform: translateY(38px);
   transition: opacity 0.9s var(--ease), transform 0.9s var(--ease);
   transition-delay: var(--d, 0ms);
-  will-change: opacity, transform;
+  /* promotion is applied in section 29 only while the reveal is pending,
+     so ~55 elements do not hold compositor layers for the page's lifetime */
+  will-change: auto;
 }
 
 [data-reveal="left"] {
@@ -2670,6 +3031,188 @@ footer {
   .section-title { font-size: 3rem; }
 }
 
+/* ---------- 29. Motion layer --------------------------------------------
+   Everything that starts hidden is scoped under .js-motion, so a no-JS or
+   pre-JS render shows fully visible content instead of a blank page.
+   ------------------------------------------------------------------------- */
+
+/* ---- scroll progress reacts to fling speed ------------------------------ */
+
+.progress-bar {
+  transform-origin: 0 0;
+  transform: scaleY(var(--sv-boost, 1));
+  transition: transform 0.18s linear;
+}
+
+/* ---- project card content cascade --------------------------------------- */
+
+.js-motion .project .cascade-item {
+  opacity: 0;
+  transform: translate3d(0, 10px, 0);
+  transition: opacity 0.5s var(--ease), transform 0.55s var(--ease);
+  transition-delay: calc(var(--d, 0ms) + 140ms + var(--ci, 0) * 45ms);
+}
+
+.js-motion .project.in .cascade-item {
+  opacity: 1;
+  transform: none;
+}
+
+/* the card's own rise is shorter now that its contents carry the detail */
+.js-motion .project[data-reveal] {
+  transform: translate3d(0, 18px, 0);
+  transition-duration: 0.62s;
+}
+
+.js-motion .project[data-reveal].in {
+  transform: translate3d(0, var(--lift), 0);
+}
+
+/* ---- filter bar: sliding ink, busy state, live count -------------------- */
+
+.filters {
+  position: relative;
+  align-items: center;
+}
+
+.filter {
+  position: relative;
+  z-index: 1;
+  transition: color 0.3s var(--ease), border-color 0.3s var(--ease),
+    transform 0.35s var(--spring);
+}
+
+.filter:active {
+  transform: scale(0.96);
+}
+
+/* the gradient now lives on the ink pill, not on the button */
+.filter.on {
+  background: transparent;
+  border-color: transparent;
+  color: #fff;
+}
+
+.filter-ink {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 0;
+  width: 0;
+  height: 0;
+  border-radius: 10rem;
+  background: linear-gradient(120deg, var(--agentic), var(--research));
+  box-shadow: 0 10px 26px -12px rgba(124, 92, 255, 0.9);
+  pointer-events: none;
+  contain: layout paint;
+}
+
+.filters.is-busy {
+  pointer-events: none;
+}
+
+.filters.is-busy .filter-ink {
+  animation: ink-busy 0.7s var(--ease) infinite;
+}
+
+@keyframes ink-busy {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.4); }
+}
+
+.filter-count {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 1.2rem;
+  letter-spacing: 0.1em;
+  color: var(--ink-faint);
+  margin: -2.2rem 0 3rem;
+}
+
+.project-grid.is-filtering {
+  pointer-events: none;
+}
+
+/* ---- per-word section title reveal -------------------------------------- */
+
+.js-motion .section-title .w {
+  display: inline-block;
+  opacity: 0;
+  transform: translate3d(0, 0.42em, 0);
+  transition: opacity 0.62s var(--ease), transform 0.72s var(--ease);
+  transition-delay: var(--wd, 0ms);
+}
+
+.js-motion .section-title.split-in .w {
+  opacity: 1;
+  transform: none;
+}
+
+/* the block-level reveal drops its translate; the words carry it now */
+.js-motion .section-head.has-split[data-reveal] {
+  transform: none;
+  transition: opacity 0.5s var(--ease);
+}
+
+/* ---- scroll-linked header depth ----------------------------------------- */
+
+@media (min-width: 900px) {
+  .js-motion .section-head .eyebrow,
+  .js-motion .section-head .section-title,
+  .js-motion .section-head .section-sub {
+    transform: translate3d(0, var(--py, 0px), 0);
+  }
+}
+
+/* ---- section dividers: scroll-linked stroke draw ------------------------ */
+
+.divider {
+  --draw: 0;
+  position: relative;
+  z-index: 2;
+  max-width: 1440px;
+  margin-inline: auto;
+  padding-inline: 8vw;
+  height: 4rem;
+}
+
+.divider svg {
+  width: 100%;
+  height: 4rem;
+  overflow: visible;
+}
+
+.divider-path {
+  fill: none;
+  stroke: url(#dividerGrad);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: calc(1 - var(--draw));
+}
+
+.divider-spark {
+  fill: none;
+  stroke: #a5f3fc;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-dasharray: 0.035 1;
+  stroke-dashoffset: calc(0.035 - var(--draw));
+  opacity: calc(var(--draw) * (1 - var(--draw)) * 4);
+  filter: drop-shadow(0 0 6px rgba(34, 211, 238, 0.9));
+}
+
+/* ---- only promote a reveal target while it is actually pending ---------- */
+
+.js-motion [data-reveal]:not(.in) {
+  will-change: opacity, transform;
+}
+
+/* ---- Contact link is mobile-nav only ------------------------------------ */
+
+@media (min-width: 901px) {
+  .nav-only-mobile { display: none; }
+}
+
 /* ---------- 28. Motion preferences --------------------------------------- */
 
 @media (prefers-reduced-motion: reduce) {
@@ -2692,6 +3235,27 @@ footer {
   .fx-grain {
     display: none;
   }
+
+  /* static opacity:0 states must be force-shown, or the content is invisible */
+  .js-motion .project .cascade-item,
+  .js-motion .section-title .w {
+    opacity: 1 !important;
+    transform: none !important;
+    transition-delay: 0ms !important;
+  }
+
+  .js-motion .section-head .eyebrow,
+  .js-motion .section-head .section-title,
+  .js-motion .section-head .section-sub {
+    --py: 0px !important;
+    transform: none !important;
+  }
+
+  .divider { --draw: 1 !important; }
+  .divider-spark { display: none !important; }
+  .progress-bar { transform: none !important; }
+  .filters.is-busy .filter-ink { animation: none !important; }
+  #projects .section-head::before { animation: none !important; }
 }
 
 @media print {

@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://baharul0111.github.io/MyPortfolioWebsite/sitemap.xml

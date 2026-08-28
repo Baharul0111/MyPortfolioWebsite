@@ -73,6 +73,53 @@
   const header = $("header");
   const topBtn = $(".scroll-top");
 
+  /* ---------- Shared scroll ticker (rAF-gated, velocity-aware) ----------
+     One scroll listener, one rAF gate, one job list. Replaces the previously
+     unthrottled handlers — the timeline draw in particular was calling
+     getBoundingClientRect() on every scroll event, forcing a synchronous
+     layout each time. Velocity is exponentially smoothed and self-decays, so
+     effects settle instead of freezing mid-fling. */
+
+  const ticker = (function () {
+    const jobs = new Set();
+    let queued = false;
+    let lastY = window.scrollY;
+    let lastT = performance.now();
+    let vel = 0;
+
+    function run() {
+      queued = false;
+      const y = window.scrollY;
+      const now = performance.now();
+      const dt = Math.max(now - lastT, 1);
+      const raw = ((y - lastY) / dt) * 16.7; /* px per frame */
+      vel += (raw - vel) * 0.25;
+      if (vel > 60) vel = 60;
+      if (vel < -60) vel = -60;
+      lastY = y;
+      lastT = now;
+
+      jobs.forEach((fn) => fn(y, vel));
+
+      if (Math.abs(vel) > 0.05) request();
+    }
+
+    function request() {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(run);
+    }
+
+    window.addEventListener("scroll", request, { passive: true });
+    window.addEventListener("resize", request);
+
+    return {
+      add(fn) { jobs.add(fn); request(); return () => jobs.delete(fn); },
+      request,
+      velocity() { return vel; },
+    };
+  })();
+
   function onScroll() {
     const st = window.scrollY;
     const h = document.documentElement.scrollHeight - window.innerHeight;
@@ -80,8 +127,17 @@
     if (header) header.classList.toggle("stuck", st > 40);
     if (topBtn) topBtn.classList.toggle("on", st > 500);
   }
-  window.addEventListener("scroll", onScroll, { passive: true });
+  ticker.add(onScroll);
   onScroll();
+
+  /* the progress bar thickens while you fling and settles back — a direct
+     readout of scroll speed on the cheapest possible surface */
+  if (bar && !reduced) {
+    ticker.add((y, vel) => {
+      const boost = 1 + Math.min(Math.abs(vel) / 26, 1.2);
+      bar.style.setProperty("--sv-boost", boost.toFixed(3));
+    });
+  }
 
   /* ---------- Mobile nav ------------------------------------------------- */
 
@@ -112,6 +168,13 @@
     document.addEventListener("click", (e) => {
       if (!e.target.closest(".navbar") && !e.target.closest("#menu")) {
         setMenu(false);
+      }
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && navbar.classList.contains("open")) {
+        setMenu(false);
+        menuBtn.focus();
       }
     });
   }
@@ -213,7 +276,7 @@
       const pct = Math.min(Math.max((mid - r.top) / r.height, 0), 1);
       line.style.height = pct * 100 + "%";
     }
-    window.addEventListener("scroll", draw, { passive: true });
+    ticker.add(draw);
     window.addEventListener("resize", draw);
     draw();
   });
@@ -253,7 +316,12 @@
   /* ---------- Typing ----------------------------------------------------- */
 
   const typeEl = $(".typing-text");
-  if (typeEl) {
+  if (typeEl && reduced) {
+    /* a permanent typewriter is exactly the kind of motion this setting is
+       meant to stop — show the first phrase and leave it alone */
+    const words = JSON.parse(typeEl.dataset.words || "[]");
+    typeEl.textContent = words[0] || "";
+  } else if (typeEl) {
     const words = JSON.parse(typeEl.dataset.words || "[]");
     let w = 0, c = 0, deleting = false;
 
@@ -306,39 +374,488 @@
     });
   }
 
-  /* ---------- Project filters ------------------------------------------- */
+  /* ---------- Projects: row-aware stagger + content cascade -------------
+     The old data-stagger assigned --d by DOM index, so at 12 cards the last
+     one waited over a second while already on screen. Delay is now derived
+     from the column index within its visual row and capped, so the maximum
+     wait is 350ms no matter how many cards the grid grows to. */
 
-  const filters = $$(".filter");
-  const projects = $$(".project");
+  const pGrid = $(".project-grid");
+  const pCards = pGrid ? $$(".project", pGrid) : [];
 
-  filters.forEach((btn) => {
-    btn.addEventListener("click", () => {
-      filters.forEach((b) => b.classList.remove("on"));
-      btn.classList.add("on");
-      const key = btn.dataset.filter;
+  if (pGrid && pCards.length) {
+    const CASCADE = ".proj-head, h3, :scope > p, .proj-points, .tag-row, .proj-foot";
 
-      projects.forEach((p) => {
-        const tags = (p.dataset.tags || "").split(/\s+/);
-        const show = key === "all" || tags.includes(key);
-        p.classList.toggle("hide", !show);
-        if (show) {
-          p.classList.remove("in");
-          // re-trigger the reveal transition
-          void p.offsetWidth;
-          p.classList.add("in");
+    pCards.forEach((card) => {
+      $$(CASCADE, card).forEach((el, i) => {
+        el.classList.add("cascade-item");
+        el.style.setProperty("--ci", i);
+      });
+      /* index the tags so the hover cascade runs left to right */
+      $$(".tag", card).forEach((t, i) => t.style.setProperty("--ti", i));
+    });
+
+    function layoutStagger() {
+      const shown = pCards.filter((c) => !c.classList.contains("hide"));
+      const rows = new Map();
+
+      /* read pass — every offsetTop read happens before any write */
+      shown.forEach((c) => {
+        const key = Math.round(c.offsetTop / 4) * 4;
+        if (!rows.has(key)) rows.set(key, []);
+        rows.get(key).push(c);
+      });
+
+      /* write pass */
+      rows.forEach((row) => {
+        row.forEach((c, i) => {
+          c.style.setProperty("--d", Math.min(i, 5) * 70 + "ms");
+        });
+      });
+    }
+
+    let staggerQueued = false;
+    function queueStagger() {
+      if (staggerQueued) return;
+      staggerQueued = true;
+      requestAnimationFrame(() => {
+        staggerQueued = false;
+        layoutStagger();
+      });
+    }
+
+    layoutStagger();
+    if ("ResizeObserver" in window) {
+      new ResizeObserver(queueStagger).observe(pGrid);
+    } else {
+      window.addEventListener("resize", queueStagger);
+    }
+
+    /* ---------- Projects: FLIP filter + filter bar state ----------------
+       Cards glide to their new positions instead of snapping. Measurement is
+       in document space (scrollX/scrollY added), because hiding cards changes
+       page height and the browser may clamp scrollY between the two reads —
+       viewport-space deltas would be wrong exactly when the grid shrinks most.
+       WAAPI rather than inline transforms, so the CSS `--lift` hover transform
+       is never clobbered; fill:"none" hands the element back cleanly. */
+
+    const filterBar = $(".filters");
+
+    if (filterBar) {
+      const btns = $$(".filter", filterBar);
+      const GLIDE = "cubic-bezier(.22, 1, .36, 1)";
+      let active = $(".filter.on", filterBar) || btns[0];
+      let token = 0;
+
+      function matches(card, key) {
+        if (key === "all") return true;
+        return (card.dataset.tags || "").split(/\s+/).indexOf(key) > -1;
+      }
+
+      function snapshot(list) {
+        const sx = window.scrollX;
+        const sy = window.scrollY;
+        const m = new Map();
+        list.forEach((c) => {
+          const r = c.getBoundingClientRect();
+          m.set(c, { x: r.left + sx, y: r.top + sy });
+        });
+        return m;
+      }
+
+      function commit(key) {
+        pCards.forEach((c) => c.classList.toggle("hide", !matches(c, key)));
+        layoutStagger();
+      }
+
+      /* ---- the sliding ink pill behind the active filter ---- */
+
+      const ink = document.createElement("span");
+      ink.className = "filter-ink";
+      ink.setAttribute("aria-hidden", "true");
+      filterBar.insertBefore(ink, filterBar.firstChild);
+
+      let inkPlaced = false;
+
+      function syncInk(animateIt) {
+        if (!active) return;
+        const from = { transform: ink.style.transform, width: ink.style.width };
+        ink.style.width = active.offsetWidth + "px";
+        ink.style.height = active.offsetHeight + "px";
+        ink.style.transform =
+          "translate3d(" + active.offsetLeft + "px, " + active.offsetTop + "px, 0)";
+
+        if (animateIt && inkPlaced && !reduced) {
+          ink.animate(
+            [from, { transform: ink.style.transform, width: ink.style.width }],
+            { duration: 420, easing: GLIDE }
+          );
         }
+        inkPlaced = true;
+      }
+
+      /* ---- live result count, announced politely ---- */
+
+      const readout = document.createElement("p");
+      readout.className = "filter-count";
+      readout.setAttribute("role", "status");
+      readout.setAttribute("aria-live", "polite");
+      filterBar.parentNode.insertBefore(readout, filterBar.nextSibling);
+
+      function updateCount(key) {
+        const n = pCards.filter((c) => matches(c, key)).length;
+        const label =
+          key === "all" ? n + " projects" : n + " of " + pCards.length + " projects";
+        if (readout.textContent === label) return;
+        readout.textContent = label;
+        if (reduced) return;
+        readout.animate(
+          [
+            { opacity: 0, transform: "translateY(6px)" },
+            { opacity: 1, transform: "none" },
+          ],
+          { duration: 260, easing: GLIDE }
+        );
+      }
+
+      /* ---- the FLIP itself ---- */
+
+      function run(key) {
+        const mine = ++token;
+
+        if (reduced) {
+          commit(key);
+          pCards.forEach((c) => {
+            if (!c.classList.contains("hide")) c.classList.add("in");
+          });
+          updateCount(key);
+          syncInk(false);
+          return;
+        }
+
+        /* cancel anything still in flight from a previous click, so a fast
+           double-click cannot commit the first filter after the second */
+        pCards.forEach((c) => c.getAnimations().forEach((a) => a.cancel()));
+
+        pGrid.classList.add("is-filtering");
+        filterBar.classList.add("is-busy");
+        syncInk(true);
+        updateCount(key);
+
+        const visible = pCards.filter((c) => !c.classList.contains("hide"));
+        const firsts = snapshot(visible);
+        const exiting = visible.filter((c) => !matches(c, key));
+        const staying = visible.filter((c) => matches(c, key));
+
+        const outs = exiting.map((c, i) =>
+          c
+            .animate(
+              [
+                { opacity: 1, transform: "scale(1)" },
+                { opacity: 0, transform: "scale(.94)" },
+              ],
+              { duration: 160, delay: i * 14, easing: "cubic-bezier(.4,0,1,1)", fill: "none" }
+            )
+            .finished.catch(() => {})
+        );
+
+        Promise.all(outs).then(() => {
+          if (mine !== token) return;
+
+          const entering = pCards.filter(
+            (c) => c.classList.contains("hide") && matches(c, key)
+          );
+
+          commit(key);
+          entering.forEach((c) => c.classList.add("in"));
+
+          const lasts = snapshot(staying.concat(entering));
+          const running = [];
+
+          staying.forEach((c, i) => {
+            const a = firsts.get(c);
+            const b = lasts.get(c);
+            const dx = a.x - b.x;
+            const dy = a.y - b.y;
+            if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
+            c.style.willChange = "transform";
+            running.push(
+              c
+                .animate(
+                  [
+                    { transform: "translate3d(" + dx + "px, " + dy + "px, 0)" },
+                    { transform: "translate3d(0, 0, 0)" },
+                  ],
+                  { duration: 480, delay: Math.min(i * 16, 120), easing: GLIDE, fill: "none" }
+                )
+                .finished.catch(() => {})
+                .then(() => { c.style.willChange = ""; })
+            );
+          });
+
+          entering.forEach((c, i) => {
+            c.style.willChange = "transform, opacity";
+            running.push(
+              c
+                .animate(
+                  [
+                    { opacity: 0, transform: "translate3d(0, 16px, 0) scale(.96)" },
+                    { opacity: 1, transform: "translate3d(0, 0, 0) scale(1)" },
+                  ],
+                  {
+                    duration: 460,
+                    delay: 90 + Math.min(i * 40, 320),
+                    easing: GLIDE,
+                    /* backwards, or a delayed card renders opaque then flashes */
+                    fill: "backwards",
+                  }
+                )
+                .finished.catch(() => {})
+                .then(() => { c.style.willChange = ""; })
+            );
+          });
+
+          Promise.all(running).then(() => {
+            if (mine !== token) return;
+            pGrid.classList.remove("is-filtering");
+            filterBar.classList.remove("is-busy");
+          });
+        });
+      }
+
+      btns.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          if (btn === active) return;
+          btns.forEach((b) => {
+            b.classList.remove("on");
+            b.setAttribute("aria-pressed", "false");
+          });
+          btn.classList.add("on");
+          btn.setAttribute("aria-pressed", "true");
+          active = btn;
+          run(btn.dataset.filter);
+        });
+        btn.setAttribute("aria-pressed", btn.classList.contains("on") ? "true" : "false");
+      });
+
+      syncInk(false);
+      updateCount(active ? active.dataset.filter : "all");
+      if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(() => syncInk(false));
+      }
+      if ("ResizeObserver" in window) {
+        new ResizeObserver(() => syncInk(false)).observe(filterBar);
+      }
+    }
+  }
+
+  /* ---------- Section titles: per-word reveal ---------------------------
+     .grad-text is treated as atomic: splitting inside it would break
+     background-clip: text, whose background box is that one element — the
+     result would be transparent text with no gradient behind it. */
+
+  if (!reduced) {
+    const SPLIT_ATOMIC = "br, .grad-text, [data-split-skip], code, script, style";
+
+    function splitWords(root) {
+      const out = [];
+      (function walk(node) {
+        Array.from(node.childNodes).forEach((n) => {
+          if (n.nodeType === 3) {
+            if (!n.textContent.trim()) return;
+            const frag = document.createDocumentFragment();
+            n.textContent.split(/(\s+)/).forEach((part) => {
+              if (!part) return;
+              if (/^\s+$/.test(part)) {
+                frag.appendChild(document.createTextNode(part));
+                return;
+              }
+              const w = document.createElement("span");
+              w.className = "w";
+              w.textContent = part;
+              frag.appendChild(w);
+              out.push(w);
+            });
+            n.parentNode.replaceChild(frag, n);
+          } else if (n.nodeType === 1) {
+            if (n.matches(SPLIT_ATOMIC)) {
+              if (n.tagName !== "BR") {
+                n.classList.add("w");
+                out.push(n);
+              }
+              return;
+            }
+            walk(n);
+          }
+        });
+      })(root);
+      return out;
+    }
+
+    const titles = $$(".section-title");
+
+    if (titles.length) {
+      const wio = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((en) => {
+            if (!en.isIntersecting) return;
+            en.target.classList.add("split-in");
+            wio.unobserve(en.target);
+            /* drop the layer promotion once the last word has landed */
+            setTimeout(() => {
+              $$(".w", en.target).forEach((w) => (w.style.willChange = ""));
+            }, 1200);
+          });
+        },
+        { threshold: 0.2, rootMargin: "0px 0px -50px 0px" }
+      );
+
+      titles.forEach((t) => {
+        /* keep the heading one readable string for assistive tech */
+        const label = t.textContent.replace(/\s+/g, " ").trim();
+        const words = splitWords(t);
+        if (!words.length) return;
+        t.setAttribute("aria-label", label);
+        words.forEach((w, i) => {
+          w.style.setProperty("--wd", Math.min(i, 10) * 34 + "ms");
+          w.style.willChange = "transform, opacity";
+        });
+        const head = t.closest(".section-head");
+        if (head) head.classList.add("has-split");
+        wio.observe(t);
+      });
+    }
+  }
+
+  /* ---------- Section header depth --------------------------------------
+     The three parts of each header travel at different rates as it crosses
+     the viewport; the lighter element moves furthest, which is what reads as
+     depth. An observer keeps at most two headers live, so the per-frame cost
+     is two rect reads. JS writes only --py — the transform lives in CSS, so
+     this can never clobber the reveal or per-word transforms. */
+
+  const wide = window.matchMedia("(min-width: 900px)");
+  const heads = $$(".section-head");
+
+  if (!reduced && heads.length && wide.matches) {
+    const DEPTH = [[".eyebrow", 26], [".section-title", 14], [".section-sub", 7]];
+    const parts = new Map();
+    const live = new Set();
+
+    heads.forEach((h) => {
+      const list = DEPTH.map((d) => [$(d[0], h), d[1]]).filter((p) => p[0]);
+      if (list.length) parts.set(h, list);
+    });
+
+    const pio = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((en) => {
+          const list = parts.get(en.target);
+          if (!list) return;
+          if (en.isIntersecting) {
+            live.add(en.target);
+            list.forEach((p) => (p[0].style.willChange = "transform"));
+          } else {
+            live.delete(en.target);
+            list.forEach((p) => {
+              p[0].style.willChange = "";
+              p[0].style.setProperty("--py", "0px");
+            });
+          }
+        });
+        ticker.request();
+      },
+      { rootMargin: "20% 0px 20% 0px" }
+    );
+
+    parts.forEach((list, h) => pio.observe(h));
+
+    ticker.add((y, vel) => {
+      if (!live.size) return;
+      const vh = window.innerHeight;
+      live.forEach((h) => {
+        const r = h.getBoundingClientRect();
+        /* -1 entering from below .. +1 leaving past the top */
+        const p = ((vh - r.top) / (vh + r.height)) * 2 - 1;
+        parts.get(h).forEach((pair) => {
+          const amp = pair[1];
+          /* the velocity term makes a hard fling lag a few pixels and catch up */
+          const py = -p * amp + vel * amp * 0.06;
+          pair[0].style.setProperty("--py", py.toFixed(2) + "px");
+        });
       });
     });
-  });
+  }
+
+  /* ---------- Section dividers: scroll-linked stroke draw ---------------
+     pathLength="1" normalises the path to unit length, so the draw is pure
+     stroke-dashoffset arithmetic — no getTotalLength(), no layout, paint only.
+     Scrubbed rather than triggered, so it reverses on scroll-up. */
+
+  const dividers = $$(".divider");
+
+  if (dividers.length) {
+    if (reduced) {
+      dividers.forEach((d) => d.style.setProperty("--draw", "1"));
+    } else {
+      const dio = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((en) => {
+            en.target.__on = en.isIntersecting;
+          });
+          ticker.request();
+        },
+        { rootMargin: "15% 0px 15% 0px" }
+      );
+
+      dividers.forEach((d) => dio.observe(d));
+
+      ticker.add(() => {
+        const vh = window.innerHeight;
+        dividers.forEach((d) => {
+          if (!d.__on) return;
+          const r = d.getBoundingClientRect();
+          const p = (vh * 0.9 - r.top) / (vh * 0.55);
+          d.style.setProperty("--draw", Math.min(Math.max(p, 0), 1).toFixed(3));
+        });
+      });
+    }
+  }
 
   /* ---------- Publication accordion ------------------------------------- */
 
   $$(".pub-main").forEach((head) => {
-    function toggle() {
-      const pub = head.closest(".pub");
-      const open = pub.classList.toggle("open");
+    const pub = head.closest(".pub");
+    const body = $(".pub-body", pub);
+
+    /* A collapsed panel is only clipped to zero height, so its links stayed
+       in the tab order and keyboard focus disappeared into an invisible
+       region. `inert` removes the whole subtree from focus and from the
+       accessibility tree; the hidden fallback does the same where it is
+       unsupported. */
+    function setOpen(open) {
+      pub.classList.toggle("open", open);
       head.setAttribute("aria-expanded", open ? "true" : "false");
+      if (!body) return;
+      if (open) {
+        body.removeAttribute("inert");
+      } else {
+        body.setAttribute("inert", "");
+      }
+      if (!("inert" in HTMLElement.prototype)) {
+        $$("a, button, input, textarea, select", body).forEach((el) => {
+          if (open) el.removeAttribute("tabindex");
+          else el.setAttribute("tabindex", "-1");
+        });
+      }
     }
+
+    setOpen(pub.classList.contains("open"));
+
+    function toggle() {
+      setOpen(!pub.classList.contains("open"));
+    }
+
     head.addEventListener("click", toggle);
     head.addEventListener("keydown", (e) => {
       if (e.key === "Enter" || e.key === " ") {
@@ -437,16 +954,6 @@
     });
   });
 
-  /* ---------- Tab title swap -------------------------------------------- */
-
-  const realTitle = document.title;
-  document.addEventListener("visibilitychange", () => {
-    document.title =
-      document.visibilityState === "visible"
-        ? realTitle
-        : "Come back — there's more to see";
-  });
-
   /* ---------- Footer year ------------------------------------------------ */
 
   const yr = $("#year");
@@ -538,17 +1045,4 @@
     window.addEventListener("resize", size);
   }
 
-  /* ---------- Owner's content guard (kept from previous build) ---------- */
-
-  document.addEventListener("contextmenu", (e) => e.preventDefault());
-  document.addEventListener("keydown", (e) => {
-    const k = e.key.toUpperCase();
-    if (
-      e.key === "F12" ||
-      (e.ctrlKey && e.shiftKey && ["I", "C", "J"].includes(k)) ||
-      (e.ctrlKey && k === "U")
-    ) {
-      e.preventDefault();
-    }
-  });
 })();

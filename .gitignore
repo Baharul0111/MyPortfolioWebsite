@@ -19,3 +19,6 @@ _shot.html
 .DS_Store
 Thumbs.db
 node_modules/
+
+# Local dev tooling
+.claude/
