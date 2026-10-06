@@ -549,6 +549,171 @@
 
   <div class="project-grid">
 
+    <article class="card project" data-tags="agents" data-reveal>
+      <div class="proj-head">
+        <div class="proj-icon"><i class="fas fa-compass" aria-hidden="true"></i></div>
+        <span class="badge badge-live"><i class="fas fa-circle" style="font-size:.6rem" aria-hidden="true"></i> Public</span>
+      </div>
+      <h3>ToolRouter</h3>
+      <p>A private assistant that runs entirely on your own laptop and can reach over a thousand real tools through MCP, while never showing the model more than a handful of them at once.</p>
+      <ul class="proj-points">
+        <li>For every request it retrieves the <strong>3–8 tools that matter</strong> and gives the local model only those, so the prompt stays small as the tool catalogue grows.</li>
+        <li>Cuts tool-schema tokens by <strong>94%</strong> at 50 tools — 370 against 5,776 — sending 2.2 tool definitions per request on average.</li>
+        <li>Tuned for modest hardware: Qwen3-4B via Ollama split across a <strong>2 GB GPU</strong> and CPU, with profiles for faster machines and Apple Silicon.</li>
+      </ul>
+      <div class="tag-row">
+        <span class="tag">Python</span><span class="tag">MCP</span><span class="tag">Ollama</span><span class="tag">Qwen3</span><span class="tag">Local LLM</span><span class="tag">Retrieval</span>
+      </div>
+      <div class="proj-foot">
+        <a class="btn btn-primary btn-sm" href="https://github.com/Baharul0111/ToolRouter" target="_blank" rel="noopener">
+          <svg class="i" style="width:1.6rem;height:1.6rem" aria-hidden="true"><use href="#si-github"/></svg> View code
+        </a>
+      </div>
+    </article>
+
+    <article class="card project" data-tags="agents" data-reveal>
+      <div class="proj-head">
+        <div class="proj-icon"><i class="fas fa-code-branch" aria-hidden="true"></i></div>
+        <span class="badge badge-live"><i class="fas fa-circle" style="font-size:.6rem" aria-hidden="true"></i> Public</span>
+      </div>
+      <h3>OSS Contribution Copilot</h3>
+      <p>An agent that carries an open-source contribution from finding the issue through to merge — and cannot take a single public action without a human clicking approve.</p>
+      <ul class="proj-points">
+        <li>Runs the whole job — discover, claim, sandbox, plan, build, validate, review, open the pull request and follow it — stopping at <strong>four human gates</strong>.</li>
+        <li>Writes only to repositories on an <strong>allow-list you control</strong>, and meters every model call so spend cannot run away.</li>
+        <li>Before the hackathon it had opened 4 pull requests and merged 2 for roughly <strong>$12 of total model spend</strong>.</li>
+      </ul>
+      <div class="tag-row">
+        <span class="tag">Python</span><span class="tag">LangGraph</span><span class="tag">Claude Agent SDK</span><span class="tag">Human-in-the-loop</span><span class="tag">GitHub API</span>
+      </div>
+      <div class="proj-foot">
+        <a class="btn btn-primary btn-sm" href="https://github.com/Baharul0111/Opensource-Agent" target="_blank" rel="noopener">
+          <svg class="i" style="width:1.6rem;height:1.6rem" aria-hidden="true"><use href="#si-github"/></svg> View code
+        </a>
+        <a class="btn btn-ghost btn-sm" href="https://baharul0111.github.io/Opensource-Agent/" target="_blank" rel="noopener">
+          <i class="fas fa-external-link-alt" aria-hidden="true"></i> Project page
+        </a>
+      </div>
+    </article>
+
+    <article class="card project" data-tags="systems" data-reveal>
+      <div class="proj-head">
+        <div class="proj-icon"><i class="fas fa-shield-alt" aria-hidden="true"></i></div>
+        <span class="badge badge-live"><i class="fas fa-circle" style="font-size:.6rem" aria-hidden="true"></i> Public</span>
+      </div>
+      <h3>BuildGuard</h3>
+      <p>A kit you drop into a project before building with an AI assistant. It makes you pin down what must be built and what must not be, locks that list, and then physically prevents the assistant from wandering off it.</p>
+      <ul class="proj-points">
+        <li>Session Zero interviews you into an explicit scope, then <strong>freeze</strong> locks it — nothing is enforced until you run that command yourself.</li>
+        <li>Enforcement rides on editor hooks and permission rules, so a change outside the agreed scope is <strong>blocked before it reaches disk</strong>.</li>
+        <li>Distinguishes <strong>INSTALLED from ARMED</strong>: a kit installed into an already-open session is inert, and every status line says so until a hook actually fires.</li>
+        <li>One file, <strong>no dependencies and no network</strong> — Python 3.11+.</li>
+      </ul>
+      <div class="tag-row">
+        <span class="tag">Python</span><span class="tag">Claude Code</span><span class="tag">Hooks</span><span class="tag">Guardrails</span><span class="tag">Zero-dependency</span>
+      </div>
+      <div class="proj-foot">
+        <a class="btn btn-primary btn-sm" href="https://github.com/Baharul0111/BuildGuard" target="_blank" rel="noopener">
+          <svg class="i" style="width:1.6rem;height:1.6rem" aria-hidden="true"><use href="#si-github"/></svg> View code
+        </a>
+      </div>
+    </article>
+
+    <article class="card project" data-tags="systems" data-reveal>
+      <div class="proj-head">
+        <div class="proj-icon"><i class="fas fa-file-code" aria-hidden="true"></i></div>
+        <span class="badge badge-live"><i class="fas fa-circle" style="font-size:.6rem" aria-hidden="true"></i> Public</span>
+      </div>
+      <h3>ExplainIT</h3>
+      <p>A VS Code extension that keeps a plain-English twin of every code file and puts a human checkpoint in front of every change an AI coding assistant tries to make.</p>
+      <ul class="proj-points">
+        <li>Opening a file opens a twin beside it that lists every function in order and describes each in a few sentences anyone can follow.</li>
+        <li>When an assistant edits code the change is <strong>stopped before it reaches the disk</strong> — you review it one function at a time, and only Accept lets it land.</li>
+        <li>Reject sends your reason straight back to the assistant so it can revise; the twin is never committed or pushed.</li>
+        <li><strong>Local only</strong> — ships no model, holds no keys, runs no server and sends no telemetry.</li>
+      </ul>
+      <div class="tag-row">
+        <span class="tag">TypeScript</span><span class="tag">VS Code API</span><span class="tag">Developer tooling</span><span class="tag">Local-first</span>
+      </div>
+      <div class="proj-foot">
+        <a class="btn btn-primary btn-sm" href="https://github.com/Baharul0111/explainit" target="_blank" rel="noopener">
+          <svg class="i" style="width:1.6rem;height:1.6rem" aria-hidden="true"><use href="#si-github"/></svg> View code
+        </a>
+        <a class="btn btn-ghost btn-sm" href="https://marketplace.visualstudio.com/items?itemName=BaharulIslam.explainit-code" target="_blank" rel="noopener">
+          <i class="fas fa-external-link-alt" aria-hidden="true"></i> Marketplace
+        </a>
+      </div>
+    </article>
+
+    <article class="card project" data-tags="systems" data-reveal>
+      <div class="proj-head">
+        <div class="proj-icon"><i class="fas fa-project-diagram" aria-hidden="true"></i></div>
+        <span class="badge badge-live"><i class="fas fa-circle" style="font-size:.6rem" aria-hidden="true"></i> Public</span>
+      </div>
+      <h3>CodeFlow Explorer</h3>
+      <p>Upload a codebase and read how it works as a flow you can open up — from where information enters the system down to the lines inside one small function. Every box points at real code.</p>
+      <ul class="proj-points">
+        <li>Reads the project <strong>statically and never runs it</strong>, turning a zip into a drill-down flow graph across six colour-coded stages.</li>
+        <li>Every explanation is written for <strong>someone who has never programmed</strong>, with each node anchored to the real source it describes.</li>
+        <li>Graphs can be shared and explored in the browser with no install and no key.</li>
+      </ul>
+      <div class="tag-row">
+        <span class="tag">Python</span><span class="tag">Node</span><span class="tag">Static analysis</span><span class="tag">Anthropic API</span><span class="tag">Graph UI</span>
+      </div>
+      <div class="proj-foot">
+        <a class="btn btn-primary btn-sm" href="https://github.com/Baharul0111/CodeFlow-Explorer" target="_blank" rel="noopener">
+          <svg class="i" style="width:1.6rem;height:1.6rem" aria-hidden="true"><use href="#si-github"/></svg> View code
+        </a>
+        <a class="btn btn-ghost btn-sm" href="https://baharul0111.github.io/CodeFlow-Explorer/" target="_blank" rel="noopener">
+          <i class="fas fa-external-link-alt" aria-hidden="true"></i> Live demo
+        </a>
+      </div>
+    </article>
+
+    <article class="card project" data-tags="systems" data-reveal>
+      <div class="proj-head">
+        <div class="proj-icon"><i class="fas fa-bullseye" aria-hidden="true"></i></div>
+        <span class="badge badge-live"><i class="fas fa-circle" style="font-size:.6rem" aria-hidden="true"></i> Public</span>
+      </div>
+      <h3>Booty Goblin</h3>
+      <p>A quiet macOS menu-bar helper that holds you to the one sentence you said you were going to do. It asks what you are working on, watches the desktop once a second, and speaks only when you have genuinely drifted.</p>
+      <ul class="proj-points">
+        <li>Lives as <strong>a single glyph in the menu bar</strong> — no window, no Dock icon — colour-coded for idle, on task, drifting and on a break.</li>
+        <li>Samples the whole desktop <strong>once a second</strong> and only interrupts on real drift, then asks a plain question rather than nagging.</li>
+        <li>One-command install that builds its own virtualenv, plus <strong>doctor and headless modes</strong> for environment checks and terminal-only runs.</li>
+      </ul>
+      <div class="tag-row">
+        <span class="tag">Python</span><span class="tag">macOS</span><span class="tag">Menu bar</span><span class="tag">OpenAI API</span><span class="tag">Screen capture</span>
+      </div>
+      <div class="proj-foot">
+        <a class="btn btn-primary btn-sm" href="https://github.com/Baharul0111/booty-goblin" target="_blank" rel="noopener">
+          <svg class="i" style="width:1.6rem;height:1.6rem" aria-hidden="true"><use href="#si-github"/></svg> View code
+        </a>
+      </div>
+    </article>
+
+    <article class="card project" data-tags="research" data-reveal>
+      <div class="proj-head">
+        <div class="proj-icon"><i class="fas fa-bolt" aria-hidden="true"></i></div>
+        <span class="badge badge-live"><i class="fas fa-circle" style="font-size:.6rem" aria-hidden="true"></i> Public</span>
+      </div>
+      <h3>Runtime Drift &amp; Energy-Aware Routing</h3>
+      <p>Data, simulator and figure pipeline for a measurement study showing that runtime drift breaks static energy profiles, together with a survival-constrained router built to hold a budget despite that drift.</p>
+      <ul class="proj-points">
+        <li>Every one of the <strong>seven data figures and four tables</strong> in the paper is generated from CSV — nothing is typed by hand into the LaTeX.</li>
+        <li>A <strong>discrete-event simulator</strong> produces the underlying measurements, covering rank inversions, reprofiling cost, budget adherence and staleness robustness.</li>
+        <li>A verifier re-checks every published claim against the data and ends on <strong>81/81 checks passed</strong>, so the result set rebuilds with one make.</li>
+      </ul>
+      <div class="tag-row">
+        <span class="tag">Python</span><span class="tag">NumPy</span><span class="tag">matplotlib</span><span class="tag">Simulation</span><span class="tag">Reproducible research</span>
+      </div>
+      <div class="proj-foot">
+        <a class="btn btn-primary btn-sm" href="https://github.com/Baharul0111/drift-routing" target="_blank" rel="noopener">
+          <svg class="i" style="width:1.6rem;height:1.6rem" aria-hidden="true"><use href="#si-github"/></svg> View code
+        </a>
+      </div>
+    </article>
+
     <!-- Vaani -->
     <article class="card project" data-tags="systems" data-reveal>
       <div class="proj-head">
